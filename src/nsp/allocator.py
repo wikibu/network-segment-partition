@@ -51,9 +51,29 @@ def allocate(
     else:
         allocations.sort(key=lambda a: int(a.network.network_address))
 
+    remaining_nets = _compute_remaining(parent, allocations)
     return PartitionResult(
         parent=parent,
         allocations=tuple(allocations),
-        remaining=(),  # filled in by Task 6
+        remaining=tuple(remaining_nets),
         sorted_internally=sort,
     )
+
+
+def _compute_remaining(parent: IPv4Network,
+                       allocations: list[Allocation]) -> list[IPv4Network]:
+    """Subtract allocated subnets from parent, collapse to maximal CIDR blocks."""
+    used = sorted({a.network for a in allocations},
+                  key=lambda n: int(n.network_address))
+
+    remaining: list[IPv4Network] = [parent]
+    for used_net in used:
+        new_remaining: list[IPv4Network] = []
+        for r in remaining:
+            if used_net.subnet_of(r):
+                new_remaining.extend(r.address_exclude(used_net))
+            else:
+                new_remaining.append(r)
+        remaining = new_remaining
+
+    return list(ipaddress.collapse_addresses(remaining))
