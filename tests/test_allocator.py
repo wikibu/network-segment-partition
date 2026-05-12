@@ -91,7 +91,7 @@ def test_remaining_empty_when_fully_packed():
 
 
 def test_capacity_exceeded_pre_check():
-    """Three /25 (768 addresses) cannot fit in a /24 (256)."""
+    """Three /25 (384 addresses) cannot fit in a /24 (256)."""
     parent = IPv4Network("10.10.0.0/24")
     reqs = _reqs(25, 25, 25)
 
