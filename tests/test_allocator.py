@@ -3,7 +3,7 @@ from ipaddress import IPv4Network
 import pytest
 
 from nsp.allocator import allocate
-from nsp.errors import CapacityExceededError
+from nsp.errors import CapacityExceededError, SubnetTooLargeError
 from nsp.models import SubnetRequest
 
 
@@ -88,3 +88,55 @@ def test_remaining_empty_when_fully_packed():
 
     result = allocate(parent, reqs, sort=False, order="input")
     assert result.remaining == ()
+
+
+def test_capacity_exceeded_pre_check():
+    """Three /25 (768 addresses) cannot fit in a /24 (256)."""
+    parent = IPv4Network("10.10.0.0/24")
+    reqs = _reqs(25, 25, 25)
+
+    with pytest.raises(CapacityExceededError) as exc:
+        allocate(parent, reqs, sort=False, order="input")
+
+    assert exc.value.requested == 384  # 3 * 128
+    assert exc.value.available == 256
+    assert exc.value.short_by == 128
+
+
+def test_subnet_too_large():
+    """A /15 cannot fit in a /16 parent."""
+    parent = IPv4Network("10.10.0.0/16")
+    reqs = _reqs(15)
+
+    with pytest.raises(SubnetTooLargeError) as exc:
+        allocate(parent, reqs, sort=False, order="input")
+    assert exc.value.request_prefix == 15
+
+
+def test_subnet_equal_to_parent_succeeds():
+    """A /16 mask in a /16 parent fills it exactly."""
+    parent = IPv4Network("10.10.0.0/16")
+    reqs = _reqs(16)
+
+    result = allocate(parent, reqs, sort=False, order="input")
+    assert [str(a.network) for a in result.allocations] == ["10.10.0.0/16"]
+    assert result.remaining == ()
+
+
+def test_alignment_capacity_error_suggests_sort():
+    """Order producing alignment gaps that overflow should hint --sort.
+
+    parent /23 (512), reqs [/25 (128), /24 (256), /25 (128)] total 512 = parent
+      /25 at 0 → cursor 128
+      /24 aligns to 256 → end 511, cursor 512
+      /25 aligns to 512 — beyond parent end (511). Overflow!
+    """
+    parent = IPv4Network("10.10.0.0/23")
+    reqs = _reqs(25, 24, 25)  # 128 + 256 + 128 = 512 exact
+
+    with pytest.raises(CapacityExceededError) as exc:
+        allocate(parent, reqs, sort=False, order="input")
+
+    assert exc.value.hint is not None
+    assert "--sort" in exc.value.hint
+    assert exc.value.align_prefix == 25

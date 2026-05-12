@@ -16,6 +16,24 @@ def allocate(
 ) -> PartitionResult:
     """Allocate subnets in parent according to requests."""
 
+    # Pre-check 1: any single request bigger than parent
+    for r in requests:
+        if r.prefix_length < parent.prefixlen:
+            raise SubnetTooLargeError(
+                request_prefix=r.prefix_length,
+                parent_cidr=str(parent),
+            )
+
+    # Pre-check 2: aggregate capacity
+    requested_total = sum(2 ** (32 - r.prefix_length) for r in requests)
+    parent_total = parent.num_addresses
+    if requested_total > parent_total:
+        raise CapacityExceededError(
+            short_by=requested_total - parent_total,
+            requested=requested_total,
+            available=parent_total,
+        )
+
     work_list = sorted(requests, key=lambda r: r.prefix_length) if sort else list(requests)
 
     cursor = int(parent.network_address)
