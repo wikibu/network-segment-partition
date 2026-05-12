@@ -77,3 +77,27 @@ def test_yaml_structure_matches_json(sample_result):
     yaml_parsed = yaml.safe_load(render_yaml(sample_result))
     json_parsed = json.loads(render_json(sample_result))
     assert yaml_parsed == json_parsed
+
+
+import csv as csv_mod
+from io import StringIO
+
+from nsp.formatters.csv_fmt import render as render_csv
+
+
+def test_csv_section_and_headers(sample_result):
+    out = render_csv(sample_result)
+    reader = csv_mod.reader(StringIO(out))
+    rows = list(reader)
+
+    assert rows[0] == [
+        "section", "index", "cidr", "mask", "prefix_length",
+        "size", "range_start", "range_end", "label"
+    ]
+    assert rows[1] == [
+        "allocated", "1", "10.10.0.0/19", "255.255.224.0", "19",
+        "8192", "10.10.0.0", "10.10.31.255", "web"
+    ]
+    rem_first = next(r for r in rows if r[0] == "remaining" and r[1] == "1")
+    assert rem_first[-1] == ""
+    assert rem_first[2] == "10.10.64.0/18"
