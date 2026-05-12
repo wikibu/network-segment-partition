@@ -203,3 +203,32 @@ def test_sorted_internally_flag():
 
     assert allocate(parent, reqs, sort=False, order="input").sorted_internally is False
     assert allocate(parent, reqs, sort=True, order="input").sorted_internally is True
+
+
+def test_slash_31_allowed():
+    parent = IPv4Network("10.10.0.0/24")
+    reqs = _reqs(31, 31)
+    result = allocate(parent, reqs, sort=False, order="input")
+    assert [str(a.network) for a in result.allocations] == [
+        "10.10.0.0/31", "10.10.0.2/31"
+    ]
+
+
+def test_slash_32_allowed():
+    parent = IPv4Network("10.10.0.0/24")
+    reqs = _reqs(32, 32, 32)
+    result = allocate(parent, reqs, sort=False, order="input")
+    assert [str(a.network) for a in result.allocations] == [
+        "10.10.0.0/32", "10.10.0.1/32", "10.10.0.2/32"
+    ]
+
+
+def test_parent_zero_zero():
+    """parent 0.0.0.0/0 (entire IPv4 space) accepts /1 split."""
+    parent = IPv4Network("0.0.0.0/0")
+    reqs = _reqs(1, 1)
+    result = allocate(parent, reqs, sort=False, order="input")
+    assert [str(a.network) for a in result.allocations] == [
+        "0.0.0.0/1", "128.0.0.0/1"
+    ]
+    assert result.remaining == ()
