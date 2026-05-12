@@ -65,3 +65,15 @@ def test_json_null_label_for_unnamed():
     )
     parsed = json.loads(render_json(res, order="input"))
     assert parsed["allocated"][0]["label"] is None
+
+
+import yaml
+
+from nsp.formatters.yaml_fmt import render as render_yaml
+
+
+def test_yaml_structure_matches_json(sample_result):
+    """YAML and JSON should serialize to the same payload."""
+    yaml_parsed = yaml.safe_load(render_yaml(sample_result))
+    json_parsed = json.loads(render_json(sample_result))
+    assert yaml_parsed == json_parsed
