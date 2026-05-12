@@ -70,6 +70,8 @@ def test_remaining_when_gaps_exist():
     # Gap 10.10.8.0 - 10.10.31.255 plus the rest after /19 (64.0 - 255.255)
     # Gap is 24 addresses worth — but in /N form: 8.0/21, 16.0/20
     # Rest: 64.0/18, 128.0/17
+    # Exact length asserted to catch spurious extra blocks (spec invariant: smallest possible set).
+    assert len(result.remaining) == 4
     assert "10.10.8.0/21" in remaining_strs
     assert "10.10.16.0/20" in remaining_strs
     assert "10.10.64.0/18" in remaining_strs
