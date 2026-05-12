@@ -101,3 +101,59 @@ def test_csv_section_and_headers(sample_result):
     rem_first = next(r for r in rows if r[0] == "remaining" and r[1] == "1")
     assert rem_first[-1] == ""
     assert rem_first[2] == "10.10.64.0/18"
+
+
+from nsp.formatters.table import render as render_table
+
+
+def test_table_contains_parent_line(sample_result):
+    out = render_table(sample_result)
+    assert "Parent: 10.10.0.0/16" in out
+    assert "65536 addresses" in out
+
+
+def test_table_has_allocated_and_remaining_sections(sample_result):
+    out = render_table(sample_result)
+    assert "Allocated (4):" in out
+    assert "Remaining (2):" in out
+
+
+def test_table_columns_aligned(sample_result):
+    """Every data line should start aligned with its header line in the same section."""
+    out = render_table(sample_result)
+    lines = out.splitlines()
+    header_idx = next(i for i, l in enumerate(lines) if l.lstrip().startswith("#"))
+    header_line = lines[header_idx]
+    cidr_col = header_line.index("CIDR")
+    for data_line in lines[header_idx + 1: header_idx + 5]:
+        assert data_line[cidr_col].isdigit() or data_line[cidr_col].isalnum()
+
+
+def test_table_unnamed_label_shows_dash():
+    from ipaddress import IPv4Network as N
+    from nsp.models import Allocation, PartitionResult, SubnetRequest
+
+    res = PartitionResult(
+        parent=N("10.0.0.0/16"),
+        allocations=(Allocation(SubnetRequest(20, None, 0), N("10.0.0.0/20")),),
+        remaining=(),
+        sorted_internally=False,
+    )
+    out = render_table(res)
+    data_lines = [l for l in out.splitlines() if l.strip().startswith("1 ")]
+    assert any(line.rstrip().endswith("-") for line in data_lines)
+
+
+def test_table_empty_remaining_shows_none():
+    from ipaddress import IPv4Network as N
+    from nsp.models import Allocation, PartitionResult, SubnetRequest
+
+    res = PartitionResult(
+        parent=N("10.0.0.0/16"),
+        allocations=(Allocation(SubnetRequest(16, "all", 0), N("10.0.0.0/16")),),
+        remaining=(),
+        sorted_internally=False,
+    )
+    out = render_table(res)
+    assert "Remaining (0):" in out
+    assert "(none)" in out
