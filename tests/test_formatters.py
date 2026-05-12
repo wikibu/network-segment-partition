@@ -157,3 +157,29 @@ def test_table_empty_remaining_shows_none():
     out = render_table(res)
     assert "Remaining (0):" in out
     assert "(none)" in out
+
+
+import pytest
+
+from nsp.formatters import get_renderer
+
+
+def test_dispatcher_returns_callable_per_format(sample_result):
+    for name in ["table", "json", "yaml", "csv", "plain"]:
+        renderer = get_renderer(name)
+        out = renderer(sample_result)
+        assert isinstance(out, str)
+        assert len(out) > 0
+
+
+def test_dispatcher_unknown_raises():
+    with pytest.raises(ValueError):
+        get_renderer("xml")
+
+
+def test_dispatcher_json_yaml_pass_order(sample_result):
+    """JSON/YAML renderers should accept and propagate the order parameter."""
+    out_input = get_renderer("json")(sample_result, order="input")
+    out_address = get_renderer("json")(sample_result, order="address")
+    assert json.loads(out_input)["meta"]["order"] == "input"
+    assert json.loads(out_address)["meta"]["order"] == "address"
