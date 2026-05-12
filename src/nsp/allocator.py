@@ -51,11 +51,11 @@ def allocate(
                 # render align_at as an IPv4 address. Fall back to the no-align form.
                 raise CapacityExceededError(
                     short_by=short_by,
-                    hint="alignment gaps consumed available space; try --sort",
+                    hint="try --sort to pack tightly",
                 )
             raise CapacityExceededError(
                 short_by=short_by,
-                hint="alignment gaps consumed available space; try --sort",
+                hint="try --sort to pack tightly",
                 align_at=str(ipaddress.IPv4Address(aligned)),
                 align_prefix=req.prefix_length,
             )

@@ -5,6 +5,9 @@ class NSPError(Exception):
     """Base for all business errors. CLI maps exit_code to process exit."""
     exit_code: int = 1
 
+    def message(self) -> str:
+        return str(self)
+
 
 class InvalidCIDRError(NSPError):
     """Parent CIDR string is malformed."""
