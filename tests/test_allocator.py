@@ -140,3 +140,66 @@ def test_alignment_capacity_error_suggests_sort():
     assert exc.value.hint is not None
     assert "--sort" in exc.value.hint
     assert exc.value.align_prefix == 25
+
+
+def test_sort_packs_tightly():
+    """Same input that produces gaps without --sort packs without gaps with --sort."""
+    parent = IPv4Network("10.10.0.0/16")
+    reqs = _reqs(21, 19)
+
+    result = allocate(parent, reqs, sort=True, order="input")
+
+    networks = {str(a.network) for a in result.allocations}
+    assert networks == {"10.10.0.0/19", "10.10.32.0/21"}
+    # Remaining is the rest: 40.0/21 + 48.0/20 + 64.0/18 + 128.0/17 collapse to 40.0/21, 48.0/20, 64.0/18, 128.0/17
+    # Just verify no gaps in the allocated range (no /21-sized block missing under 10.10.32.0)
+    for r in result.remaining:
+        assert int(r.network_address) >= int(IPv4Network("10.10.40.0/21").network_address)
+
+
+def test_order_input_preserves_input_order():
+    parent = IPv4Network("10.10.0.0/16")
+    reqs = [
+        SubnetRequest(prefix_length=21, label="web", order=0),
+        SubnetRequest(prefix_length=19, label="db", order=1),
+        SubnetRequest(prefix_length=20, label="cache", order=2),
+    ]
+    result = allocate(parent, reqs, sort=True, order="input")
+    labels = [a.request.label for a in result.allocations]
+    assert labels == ["web", "db", "cache"]
+
+
+def test_order_address_sorts_by_address():
+    parent = IPv4Network("10.10.0.0/16")
+    reqs = [
+        SubnetRequest(prefix_length=21, label="web", order=0),
+        SubnetRequest(prefix_length=19, label="db", order=1),
+        SubnetRequest(prefix_length=20, label="cache", order=2),
+    ]
+    result = allocate(parent, reqs, sort=True, order="address")
+    addrs = [int(a.network.network_address) for a in result.allocations]
+    assert addrs == sorted(addrs)
+    # With --sort, db (/19) is placed first at 0, cache (/20) at 32.0, web (/21) at 48.0
+    labels_in_addr_order = [a.request.label for a in result.allocations]
+    assert labels_in_addr_order == ["db", "cache", "web"]
+
+
+def test_sort_is_stable_for_equal_prefixes():
+    """Two /21s with sort=True must keep their original relative order."""
+    parent = IPv4Network("10.10.0.0/16")
+    reqs = [
+        SubnetRequest(prefix_length=21, label="first", order=0),
+        SubnetRequest(prefix_length=21, label="second", order=1),
+    ]
+    result = allocate(parent, reqs, sort=True, order="address")
+    # In address order: first must come before second
+    addr_order = [a.request.label for a in result.allocations]
+    assert addr_order == ["first", "second"]
+
+
+def test_sorted_internally_flag():
+    parent = IPv4Network("10.10.0.0/16")
+    reqs = _reqs(19)
+
+    assert allocate(parent, reqs, sort=False, order="input").sorted_internally is False
+    assert allocate(parent, reqs, sort=True, order="input").sorted_internally is True
